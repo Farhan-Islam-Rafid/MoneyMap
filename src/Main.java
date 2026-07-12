@@ -1,38 +1,25 @@
-import javax.swing.*;
-import ui.MainFrame;
+package src;
 
-/**
- * Entry point for the MoneyMap application.
- */
+import src.database.DatabaseInitializer;
+import src.ui.LoginFrame;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+
 public class Main {
-
     public static void main(String[] args) {
-        // Use the operating system's native look and feel for a
-        // cleaner, more modern appearance where available.
+        // Set modern look and feel
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
-            // Not fatal - fall back to the default Swing look and feel.
-            e.printStackTrace();
+            System.err.println("Could not set System Look and Feel.");
         }
 
+        // Initialize database and tables
+        DatabaseInitializer.initialize();
+
+        // Launch Login UI
         SwingUtilities.invokeLater(() -> {
-            try {
-                MainFrame frame = new MainFrame();
-                frame.setVisible(true);
-            } catch (Exception e) {
-                // Most likely a database connection problem (MySQL not
-                // running, wrong credentials, missing driver, etc).
-                JOptionPane.showMessageDialog(
-                        null,
-                        "MoneyMap could not start.\n" +
-                                "Please check that MySQL is running and that the " +
-                                "connection settings in DBConnection.java are correct.\n\n" +
-                                "Details: " + e.getMessage(),
-                        "MoneyMap - Startup Error",
-                        JOptionPane.ERROR_MESSAGE);
-                e.printStackTrace();
-            }
+            new LoginFrame().setVisible(true);
         });
     }
 }

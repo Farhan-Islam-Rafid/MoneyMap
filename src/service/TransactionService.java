@@ -1,100 +1,84 @@
-package service;
+package src.service;
 
-import database.DBConnection;
-import model.Transaction;
+import src.database.DBConnection;
+import src.model.Transaction;
 
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * TransactionService contains all the database access logic for
- * MoneyMap: inserting income/expense rows, loading transaction
- * history, and calculating the current balance.
- *
- * All queries use PreparedStatement - never a plain Statement.
- */
 public class TransactionService {
 
-    private static final String TYPE_INCOME = "Income";
-    private static final String TYPE_EXPENSE = "Expense";
+    public void addTransaction(String type, double amount, Date date, String note) throws SQLException {
+        String query = "INSERT INTO transactions (type, amount, trans_date, note) VALUES (?, ?, ?, ?)";
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-    /** Inserts a new Income row dated today. */
-    public void addIncome(double amount) throws SQLException {
-        insertTransaction(TYPE_INCOME, amount);
-    }
-
-    /** Inserts a new Expense row dated today. */
-    public void addExpense(double amount) throws SQLException {
-        insertTransaction(TYPE_EXPENSE, amount);
-    }
-
-    private void insertTransaction(String type, double amount) throws SQLException {
-        String sql = "INSERT INTO transactions (type, amount, transaction_date) VALUES (?, ?, ?)";
-
-        Connection conn = DBConnection.getConnection();
-        try (PreparedStatement statement = conn.prepareStatement(sql)) {
-            statement.setString(1, type);
-            statement.setDouble(2, amount);
-            statement.setDate(3, Date.valueOf(LocalDate.now()));
-            statement.executeUpdate();
+            pstmt.setString(1, type);
+            pstmt.setDouble(2, amount);
+            pstmt.setDate(3, date);
+            pstmt.setString(4, note);
+            pstmt.executeUpdate();
         }
     }
 
-    /** Returns every transaction, newest first (highest id first). */
-    public List<Transaction> loadHistory() throws SQLException {
-        List<Transaction> transactions = new ArrayList<>();
-        String sql = "SELECT id, type, amount, transaction_date " +
-                "FROM transactions ORDER BY id DESC";
+    public List<Transaction> getTransactions(String searchType, String searchYear, String searchMonth)
+            throws SQLException {
+        List<Transaction> list = new ArrayList<>();
+        StringBuilder query = new StringBuilder("SELECT * FROM transactions WHERE 1=1");
 
-        Connection conn = DBConnection.getConnection();
-        try (PreparedStatement statement = conn.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+        if (searchType != null && !searchType.equals("All")) {
+            query.append(" AND type = '").append(searchType).append("'");
+        }
+        if (searchYear != null && !searchYear.trim().isEmpty()) {
+            query.append(" AND YEAR(trans_date) = ").append(searchYear);
+        }
+        if (searchMonth != null && !searchMonth.trim().isEmpty()) {
+            query.append(" AND MONTH(trans_date) = ").append(searchMonth);
+        }
+        query.append(" ORDER BY trans_date DESC, id DESC");
 
-            while (resultSet.next()) {
-                Transaction transaction = new Transaction(
-                        resultSet.getInt("id"),
-                        resultSet.getString("type"),
-                        resultSet.getDouble("amount"),
-                        resultSet.getDate("transaction_date").toLocalDate()
-                );
-                transactions.add(transaction);
+        try (Connection conn = DBConnection.getConnection();
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(query.toString())) {
+
+            while (rs.next()) {
+                list.add(new Transaction(
+                        rs.getInt("id"),
+                        rs.getString("type"),
+                        rs.getDouble("amount"),
+                        rs.getDate("trans_date"),
+                        rs.getString("note")));
             }
         }
-        return transactions;
+        return list;
     }
 
-    /** Sums all amounts for the given type (Income or Expense). Never returns null. */
-    private double getTotalByType(String type) throws SQLException {
-        String sql = "SELECT SUM(amount) AS total FROM transactions WHERE type = ?";
+    public double getSum(String type, LocalDate startDate, LocalDate endDate) throws SQLException {
+        String query = "SELECT SUM(amount) as total FROM transactions WHERE type = ?";
+        if (startDate != null && endDate != null) {
+            query += " AND trans_date BETWEEN ? AND ?";
+        } else if (startDate != null) {
+            query += " AND trans_date = ?";
+        }
 
-        Connection conn = DBConnection.getConnection();
-        try (PreparedStatement statement = conn.prepareStatement(sql)) {
-            statement.setString(1, type);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    double total = resultSet.getDouble("total");
-                    // SUM() returns NULL when there are no matching rows.
-                    return resultSet.wasNull() ? 0.0 : total;
-                }
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setString(1, type);
+            if (startDate != null && endDate != null) {
+                pstmt.setDate(2, Date.valueOf(startDate));
+                pstmt.setDate(3, Date.valueOf(endDate));
+            } else if (startDate != null) {
+                pstmt.setDate(2, Date.valueOf(startDate));
+            }
+
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble("total");
             }
         }
         return 0.0;
-    }
-
-    /**
-     * Calculates the current balance on the fly.
-     * Current Balance = Total Income - Total Expense.
-     * The balance itself is never stored in the database.
-     */
-    public double getCurrentBalance() throws SQLException {
-        double totalIncome = getTotalByType(TYPE_INCOME);
-        double totalExpense = getTotalByType(TYPE_EXPENSE);
-        return totalIncome - totalExpense;
     }
 }
