@@ -2,6 +2,7 @@ package src.ui;
 
 import java.awt.*;
 import java.sql.Date;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
 import javax.swing.*;
@@ -19,6 +20,7 @@ public class MainFrame extends JFrame {
 
     private final TransactionService service = new TransactionService();
     private DefaultTableModel tableModel;
+    private final DecimalFormat currencyFormat = new DecimalFormat("#,##,##0.00"); // Supports Bangladeshi style commas
 
     // Stats Labels
     private JLabel balanceLabel, todayIncLabel, todayExpLabel;
@@ -28,14 +30,14 @@ public class MainFrame extends JFrame {
 
     public MainFrame() {
         setTitle("MoneyMap v2.0 - Dashboard");
-        setSize(1300, 900);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
-        setMinimumSize(new Dimension(1200, 900));
+
+        // Best balance: Maximized window
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
 
         JPanel contentPane = new JPanel(new BorderLayout(15, 15));
         contentPane.setBackground(new Color(245, 247, 250));
-        contentPane.setBorder(new EmptyBorder(20, 20, 20, 20));
+        contentPane.setBorder(new EmptyBorder(25, 25, 25, 25)); // Slightly increased padding
 
         contentPane.add(createHeaderPanel(), BorderLayout.NORTH);
         contentPane.add(createStatsPanel(), BorderLayout.NORTH);
@@ -71,38 +73,36 @@ public class MainFrame extends JFrame {
         statsPanel.setOpaque(false);
         statsPanel.setBorder(new EmptyBorder(10, 0, 25, 0));
 
-        statsPanel
-                .add(createModernCard("Current Balance", "💰", balanceLabel = createValueLabel(new Color(0, 102, 204)),
-                        todayIncLabel = createSmallLabel(), todayExpLabel = createSmallLabel()));
+        statsPanel.add(createModernCard("Current Balance", balanceLabel = createValueLabel(new Color(0, 102, 204)),
+                todayIncLabel = createSmallLabel(), todayExpLabel = createSmallLabel()));
 
-        statsPanel.add(createModernCard("This Month", "📅", monthBalLabel = createValueLabel(new Color(0, 102, 204)),
+        statsPanel.add(createModernCard("This Month", monthBalLabel = createValueLabel(new Color(0, 102, 204)),
                 monthIncLabel = createSmallLabel(), monthExpLabel = createSmallLabel()));
 
-        statsPanel.add(createModernCard("Previous Month", "📆", prevBalLabel = createValueLabel(new Color(0, 102, 204)),
+        statsPanel.add(createModernCard("Previous Month", prevBalLabel = createValueLabel(new Color(0, 102, 204)),
                 prevIncLabel = createSmallLabel(), prevExpLabel = createSmallLabel()));
 
-        statsPanel
-                .add(createModernCard("Last 12 Months", "📊", yearSaveLabel = createValueLabel(new Color(40, 167, 69)),
-                        yearIncLabel = createSmallLabel(), yearExpLabel = createSmallLabel()));
+        statsPanel.add(createModernCard("Last 12 Months", yearSaveLabel = createValueLabel(new Color(40, 167, 69)),
+                yearIncLabel = createSmallLabel(), yearExpLabel = createSmallLabel()));
 
         return statsPanel;
     }
 
     private JLabel createValueLabel(Color color) {
         JLabel label = new JLabel();
-        label.setFont(new Font("Segoe UI", Font.BOLD, 23));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 24));
         label.setForeground(color);
         return label;
     }
 
     private JLabel createSmallLabel() {
         JLabel label = new JLabel();
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 14)); // Fixed: int instead of float
-        label.setForeground(new Color(60, 63, 65));
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        label.setForeground(new Color(75, 80, 85));
         return label;
     }
 
-    private JPanel createModernCard(String title, String emoji, JLabel mainVal, JLabel val1, JLabel val2) {
+    private JPanel createModernCard(String title, JLabel mainVal, JLabel val1, JLabel val2) {
         JPanel card = new JPanel(new GridLayout(4, 1, 0, 10)) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -121,18 +121,10 @@ public class MainFrame extends JFrame {
                 new EmptyBorder(22, 24, 22, 24)));
 
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        titleLabel.setForeground(new Color(95, 99, 104));
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        titleLabel.setForeground(new Color(70, 75, 80));
 
-        JLabel emojiLabel = new JLabel(emoji);
-        emojiLabel.setFont(new Font("Segoe UI", Font.PLAIN, 26));
-
-        JPanel header = new JPanel(new BorderLayout(8, 0));
-        header.setOpaque(false);
-        header.add(emojiLabel, BorderLayout.WEST);
-        header.add(titleLabel, BorderLayout.CENTER);
-
-        card.add(header);
+        card.add(titleLabel);
         card.add(mainVal);
         card.add(val1);
         card.add(val2);
@@ -320,7 +312,7 @@ public class MainFrame extends JFrame {
                         t.getId(),
                         DateUtils.DISPLAY_FORMAT.format(t.getDate()),
                         t.getType(),
-                        "৳ " + String.format("%.2f", t.getAmount()),
+                        formatCurrency(t.getAmount()),
                         t.getNote()
                 });
             }
@@ -336,43 +328,49 @@ public class MainFrame extends JFrame {
             double totalInc = service.getSum("Income", null, null);
             double totalExp = service.getSum("Expense", null, null);
             double balance = totalInc - totalExp;
-            balanceLabel.setText("৳ " + String.format("%.2f", balance));
+
+            balanceLabel.setText("৳ " + currencyFormat.format(balance));
             balanceLabel.setForeground(balance >= 0 ? new Color(40, 167, 69) : new Color(220, 53, 69));
 
             // Today
             double todayInc = service.getSum("Income", today, today);
             double todayExp = service.getSum("Expense", today, today);
-            todayIncLabel.setText("Income: ৳ " + String.format("%.2f", todayInc));
-            todayExpLabel.setText("Expense: ৳ " + String.format("%.2f", todayExp));
+            todayIncLabel.setText("Income: ৳ " + currencyFormat.format(todayInc));
+            todayExpLabel.setText("Expense: ৳ " + currencyFormat.format(todayExp));
 
             // This Month
             LocalDate monthStart = today.withDayOfMonth(1);
             LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
             double mInc = service.getSum("Income", monthStart, monthEnd);
             double mExp = service.getSum("Expense", monthStart, monthEnd);
-            monthBalLabel.setText("Balance: ৳ " + String.format("%.2f", mInc - mExp));
-            monthIncLabel.setText("Income: ৳ " + String.format("%.2f", mInc));
-            monthExpLabel.setText("Expense: ৳ " + String.format("%.2f", mExp));
+            monthBalLabel.setText("Balance: ৳ " + currencyFormat.format(mInc - mExp));
+            monthIncLabel.setText("Income: ৳ " + currencyFormat.format(mInc));
+            monthExpLabel.setText("Expense: ৳ " + currencyFormat.format(mExp));
 
             // Previous Month
             LocalDate pStart = monthStart.minusMonths(1);
             LocalDate pEnd = pStart.withDayOfMonth(pStart.lengthOfMonth());
             double pInc = service.getSum("Income", pStart, pEnd);
             double pExp = service.getSum("Expense", pStart, pEnd);
-            prevBalLabel.setText("Balance: ৳ " + String.format("%.2f", pInc - pExp));
-            prevIncLabel.setText("Income: ৳ " + String.format("%.2f", pInc));
-            prevExpLabel.setText("Expense: ৳ " + String.format("%.2f", pExp));
+            prevBalLabel.setText("Balance: ৳ " + currencyFormat.format(pInc - pExp));
+            prevIncLabel.setText("Income: ৳ " + currencyFormat.format(pInc));
+            prevExpLabel.setText("Expense: ৳ " + currencyFormat.format(pExp));
 
             // Last 12 Months
             LocalDate yStart = today.minusMonths(12);
             double yInc = service.getSum("Income", yStart, today);
             double yExp = service.getSum("Expense", yStart, today);
-            yearSaveLabel.setText("Saved: ৳ " + String.format("%.2f", yInc - yExp));
-            yearIncLabel.setText("Income: ৳ " + String.format("%.2f", yInc));
-            yearExpLabel.setText("Expense: ৳ " + String.format("%.2f", yExp));
+            yearSaveLabel.setText("Saved: ৳ " + currencyFormat.format(yInc - yExp));
+            yearIncLabel.setText("Income: ৳ " + currencyFormat.format(yInc));
+            yearExpLabel.setText("Expense: ৳ " + currencyFormat.format(yExp));
 
         } catch (Exception e) {
             System.err.println("Statistics update error: " + e.getMessage());
         }
+    }
+
+    /** Helper method for consistent currency formatting with commas */
+    private String formatCurrency(double amount) {
+        return "৳ " + currencyFormat.format(amount);
     }
 }
