@@ -1,12 +1,11 @@
 package src.service;
 
-import src.database.DBConnection;
-import src.model.Transaction;
-
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import src.database.DBConnection;
+import src.model.Transaction;
 
 public class TransactionService {
 
@@ -21,6 +20,52 @@ public class TransactionService {
             pstmt.setString(4, note);
             pstmt.executeUpdate();
         }
+    }
+
+    // --- NEW: Update an existing transaction ---
+    public void updateTransaction(int id, String type, double amount, Date date, String note) throws SQLException {
+        String query = "UPDATE transactions SET type = ?, amount = ?, trans_date = ?, note = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setString(1, type);
+            pstmt.setDouble(2, amount);
+            pstmt.setDate(3, date);
+            pstmt.setString(4, note);
+            pstmt.setInt(5, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    // --- NEW: Delete a transaction ---
+    public void deleteTransaction(int id) throws SQLException {
+        String query = "DELETE FROM transactions WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setInt(1, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    // --- NEW: Fetch a single transaction for editing ---
+    public Transaction getTransactionById(int id) throws SQLException {
+        String query = "SELECT * FROM transactions WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new Transaction(
+                        rs.getInt("id"),
+                        rs.getString("type"),
+                        rs.getDouble("amount"),
+                        rs.getDate("trans_date"),
+                        rs.getString("note"));
+            }
+        }
+        return null;
     }
 
     public List<Transaction> getTransactions(String searchType, String searchYear, String searchMonth)

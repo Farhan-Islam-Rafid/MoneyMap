@@ -20,6 +20,7 @@ public class MainFrame extends JFrame {
 
     private final TransactionService service = new TransactionService();
     private DefaultTableModel tableModel;
+    private JTable table;
     private final DecimalFormat currencyFormat = new DecimalFormat("#,##,##0.00"); // Supports Bangladeshi style commas
 
     // Stats Labels
@@ -261,7 +262,7 @@ public class MainFrame extends JFrame {
             }
         };
 
-        JTable table = new JTable(tableModel);
+        table = new JTable(tableModel);
         table.setRowHeight(36);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         table.setGridColor(new Color(238, 240, 244));
@@ -292,9 +293,116 @@ public class MainFrame extends JFrame {
         scrollPane.getViewport().setBackground(Color.WHITE);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(220, 224, 230), 1, true));
 
+        // Edit / Delete action panel
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
+        actionPanel.setOpaque(false);
+
+        RoundedButton editBtn = new RoundedButton("Edit Selected", new Color(255, 193, 7), Color.DARK_GRAY);
+        RoundedButton deleteBtn = new RoundedButton("Delete Selected", new Color(220, 53, 69), Color.WHITE);
+        editBtn.setPreferredSize(new Dimension(150, 40));
+        deleteBtn.setPreferredSize(new Dimension(150, 40));
+
+        editBtn.addActionListener(e -> handleEditAction());
+        deleteBtn.addActionListener(e -> handleDeleteAction());
+
+        actionPanel.add(editBtn);
+        actionPanel.add(deleteBtn);
+
         tablePanel.add(searchPanel, BorderLayout.NORTH);
         tablePanel.add(scrollPane, BorderLayout.CENTER);
+        tablePanel.add(actionPanel, BorderLayout.SOUTH);
         return tablePanel;
+    }
+
+    private void handleEditAction() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a transaction to edit.",
+                    "Selection Missing", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            int id = (int) tableModel.getValueAt(selectedRow, 0);
+            Transaction t = service.getTransactionById(id);
+
+            if (t == null) {
+                JOptionPane.showMessageDialog(this, "Transaction not found.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Create Edit Form Dialog
+            JComboBox<String> typeBox = new JComboBox<>(new String[] { "Income", "Expense" });
+            typeBox.setSelectedItem(t.getType());
+            JTextField amountField = new JTextField(String.valueOf(t.getAmount()));
+            JTextField dateField = new JTextField(t.getDate().toString());
+            JTextField noteField = new JTextField(t.getNote());
+
+            JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
+            panel.add(new JLabel("Type:"));
+            panel.add(typeBox);
+            panel.add(new JLabel("Amount:"));
+            panel.add(amountField);
+            panel.add(new JLabel("Date (YYYY-MM-DD):"));
+            panel.add(dateField);
+            panel.add(new JLabel("Note:"));
+            panel.add(noteField);
+
+            int result = JOptionPane.showConfirmDialog(this, panel, "Edit Transaction",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) {
+                double newAmount = Double.parseDouble(amountField.getText().trim());
+                if (newAmount <= 0)
+                    throw new NumberFormatException();
+                if (!DateUtils.isValidDate(dateField.getText().trim()))
+                    throw new IllegalArgumentException("Invalid date format.");
+
+                service.updateTransaction(id, typeBox.getSelectedItem().toString(), newAmount,
+                        Date.valueOf(dateField.getText().trim()), noteField.getText().trim());
+                refreshData();
+                JOptionPane.showMessageDialog(this, "✅ Transaction updated successfully!",
+                        "Success", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid positive number for amount.",
+                    "Input Error", JOptionPane.ERROR_MESSAGE);
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid date format. Use YYYY-MM-DD.",
+                    "Input Error", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error updating transaction: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleDeleteAction() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a transaction to delete.",
+                    "Selection Missing", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int id = (int) tableModel.getValueAt(selectedRow, 0);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete this transaction?",
+                "Confirm Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                service.deleteTransaction(id);
+                refreshData();
+                JOptionPane.showMessageDialog(this, "✅ Transaction deleted successfully!",
+                        "Success", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Error deleting transaction: " + e.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void refreshData() {
