@@ -5,6 +5,7 @@ import java.sql.Date;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.prefs.Preferences;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
@@ -19,8 +20,10 @@ import src.utils.DateUtils;
 public class MainFrame extends JFrame {
 
     private final TransactionService service = new TransactionService();
+    private final Preferences prefs = Preferences.userNodeForPackage(MainFrame.class);
     private DefaultTableModel tableModel;
     private JTable table;
+    private JPanel archiveListPanel;
     private final DecimalFormat currencyFormat = new DecimalFormat("#,##,##0.00"); // Supports Bangladeshi style commas
 
     // Stats Labels
@@ -43,6 +46,7 @@ public class MainFrame extends JFrame {
         contentPane.add(createHeaderPanel(), BorderLayout.NORTH);
         contentPane.add(createStatsPanel(), BorderLayout.NORTH);
         contentPane.add(createMainContentPanel(), BorderLayout.CENTER);
+        contentPane.add(createArchivePanel(), BorderLayout.EAST);
 
         setContentPane(contentPane);
         refreshData();
@@ -133,6 +137,172 @@ public class MainFrame extends JFrame {
         return card;
     }
 
+    // ================= Yearly Savings Archive (side panel) =================
+
+    /**
+     * Right-side panel that automatically keeps a permanent record of every
+     * completed 12-month (1 year) cycle's balance, so history is never lost
+     * even after the "Last 12 Months" card rolls forward.
+     */
+    private JPanel createArchivePanel() {
+        JPanel wrapper = new JPanel(new BorderLayout(0, 14));
+        wrapper.setOpaque(false);
+        wrapper.setPreferredSize(new Dimension(250, 0));
+        wrapper.setBorder(new EmptyBorder(10, 18, 0, 0));
+
+        JLabel titleLabel = new JLabel("Yearly Savings Archive");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        titleLabel.setForeground(new Color(33, 37, 41));
+
+        JLabel subLabel = new JLabel("Auto-saved every 12 months");
+        subLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        subLabel.setForeground(new Color(130, 135, 140));
+
+        JPanel headingBox = new JPanel(new GridLayout(2, 1, 0, 2));
+        headingBox.setOpaque(false);
+        headingBox.add(titleLabel);
+        headingBox.add(subLabel);
+
+        archiveListPanel = new JPanel();
+        archiveListPanel.setLayout(new BoxLayout(archiveListPanel, BoxLayout.Y_AXIS));
+        archiveListPanel.setOpaque(false);
+
+        JScrollPane scrollPane = new JScrollPane(archiveListPanel);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        wrapper.add(headingBox, BorderLayout.NORTH);
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+
+        return wrapper;
+    }
+
+    /**
+     * Returns the current 12-month cycle's start date, creating one on first run.
+     */
+    private LocalDate getCycleStart() {
+        String stored = prefs.get("cycleStart", null);
+        if (stored == null) {
+            LocalDate start = LocalDate.now();
+            prefs.put("cycleStart", start.toString());
+            return start;
+        }
+        return LocalDate.parse(stored);
+    }
+
+    /**
+     * Checks whether the running 12-month cycle has finished. If it has, the
+     * period's income/expense/balance is permanently archived and a fresh
+     * cycle begins — repeating in case the app was closed for over a year.
+     */
+    private void checkAndArchiveYear() {
+        try {
+            LocalDate cycleStart = getCycleStart();
+            LocalDate today = LocalDate.now();
+            boolean archivedAny = false;
+
+            while (!today.isBefore(cycleStart.plusMonths(12))) {
+                LocalDate cycleEnd = cycleStart.plusMonths(12).minusDays(1);
+                double inc = service.getSum("Income", cycleStart, cycleEnd);
+                double exp = service.getSum("Expense", cycleStart, cycleEnd);
+                saveArchivedYear(cycleStart, cycleEnd, inc, exp);
+                cycleStart = cycleStart.plusMonths(12);
+                archivedAny = true;
+            }
+
+            if (archivedAny) {
+                prefs.put("cycleStart", cycleStart.toString());
+            }
+        } catch (Exception e) {
+            System.err.println("Yearly archive check error: " + e.getMessage());
+        }
+    }
+
+    private void saveArchivedYear(LocalDate start, LocalDate end, double inc, double exp) {
+        String existing = prefs.get("archivedYears", "");
+        String record = start + "," + end + "," + inc + "," + exp;
+        String updated = existing.isEmpty() ? record : existing + ";" + record;
+        prefs.put("archivedYears", updated);
+    }
+
+    private void refreshArchivePanel() {
+        archiveListPanel.removeAll();
+        String data = prefs.get("archivedYears", "");
+
+        if (data.isEmpty()) {
+            JLabel empty = new JLabel(
+                    "<html><div style='width:190px; color:#82878C; font-family:Segoe UI;'>"
+                            + "No completed 12-month cycle yet. Once a full year passes, its balance "
+                            + "will be saved here automatically.</div></html>");
+            empty.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            empty.setBorder(new EmptyBorder(14, 4, 14, 4));
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+            archiveListPanel.add(empty);
+        } else {
+            String[] records = data.split(";");
+            for (int i = records.length - 1; i >= 0; i--) {
+                String[] parts = records[i].split(",");
+                LocalDate start = LocalDate.parse(parts[0]);
+                LocalDate end = LocalDate.parse(parts[1]);
+                double inc = Double.parseDouble(parts[2]);
+                double exp = Double.parseDouble(parts[3]);
+
+                JPanel card = createArchiveCard(start, end, inc, exp);
+                card.setAlignmentX(Component.LEFT_ALIGNMENT);
+                archiveListPanel.add(card);
+                archiveListPanel.add(Box.createVerticalStrut(12));
+            }
+        }
+
+        archiveListPanel.revalidate();
+        archiveListPanel.repaint();
+    }
+
+    private JPanel createArchiveCard(LocalDate start, LocalDate end, double inc, double exp) {
+        double balance = inc - exp;
+
+        JPanel card = new JPanel(new GridLayout(3, 1, 0, 5)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        card.setOpaque(false);
+        card.setBackground(Color.WHITE);
+        card.setMaximumSize(new Dimension(240, 100));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(225, 228, 232), 1),
+                new EmptyBorder(14, 16, 14, 16)));
+
+        JLabel period = new JLabel(DateUtils.DISPLAY_FORMAT.format(Date.valueOf(start)) + "  →  "
+                + DateUtils.DISPLAY_FORMAT.format(Date.valueOf(end)));
+        period.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        period.setForeground(new Color(100, 105, 110));
+
+        JLabel bal = new JLabel("৳ " + currencyFormat.format(balance));
+        bal.setFont(new Font("Segoe UI", Font.BOLD, 19));
+        bal.setForeground(balance >= 0 ? new Color(40, 167, 69) : new Color(220, 53, 69));
+
+        JLabel detail = new JLabel("In: ৳" + currencyFormat.format(inc) + "   Out: ৳" + currencyFormat.format(exp));
+        detail.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        detail.setForeground(new Color(120, 125, 130));
+
+        card.add(period);
+        card.add(bal);
+        card.add(detail);
+        return card;
+    }
+
+    // ========================================================================
+
     private JPanel createMainContentPanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 18));
         panel.setOpaque(false);
@@ -142,7 +312,7 @@ public class MainFrame extends JFrame {
     }
 
     private JPanel createInputPanel() {
-        JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 14));
+        JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
         inputPanel.setBackground(Color.WHITE);
         inputPanel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(
@@ -152,31 +322,60 @@ public class MainFrame extends JFrame {
                         new Font("Segoe UI", Font.BOLD, 15), new Color(50, 55, 60)),
                 new EmptyBorder(18, 18, 18, 18)));
 
+        // Fields row (left/center) — GridBagLayout so it stays on ONE line and
+        // the Note field never gets wrapped/clipped, unlike FlowLayout.
+        JPanel fieldsPanel = new JPanel(new GridBagLayout());
+        fieldsPanel.setOpaque(false);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 6, 4, 6);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridy = 0;
+
         JComboBox<String> typeBox = new JComboBox<>(new String[] { "Income", "Expense" });
         styleComboBox(typeBox);
 
-        JTextField amountField = new JTextField(12);
-        JTextField dateField = new JTextField(DateUtils.getToday(), 12);
-        JTextField noteField = new JTextField(22);
+        JTextField amountField = new JTextField(10);
+        JTextField dateField = new JTextField(DateUtils.getToday(), 10);
+        JTextField noteField = new JTextField(15);
 
         styleTextField(amountField);
         styleTextField(dateField);
         styleTextField(noteField);
 
-        RoundedButton addBtn = new RoundedButton("Save Transaction", new Color(40, 167, 69), Color.WHITE);
-        addBtn.setPreferredSize(new Dimension(160, 42));
+        int col = 0;
+        gbc.gridx = col++;
+        fieldsPanel.add(new JLabel("Type:"), gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(typeBox, gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(new JLabel("Amount:"), gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(amountField, gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(new JLabel("Date (YYYY-MM-DD):"), gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(dateField, gbc);
+        gbc.gridx = col++;
+        fieldsPanel.add(new JLabel("Note:"), gbc);
+        gbc.gridx = col++;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        fieldsPanel.add(noteField, gbc);
 
+        // Save button, anchored on the right and vertically centered
+        JPanel btnPanel = new JPanel(new GridBagLayout());
+        btnPanel.setOpaque(false);
+
+        RoundedButton addBtn = new RoundedButton("Save Transaction", new Color(40, 167, 69), Color.WHITE);
+        addBtn.setPreferredSize(new Dimension(170, 42));
         addBtn.addActionListener(e -> addTransaction(typeBox, amountField, dateField, noteField));
 
-        inputPanel.add(new JLabel("Type:"));
-        inputPanel.add(typeBox);
-        inputPanel.add(new JLabel("Amount:"));
-        inputPanel.add(amountField);
-        inputPanel.add(new JLabel("Date (YYYY-MM-DD):"));
-        inputPanel.add(dateField);
-        inputPanel.add(new JLabel("Note:"));
-        inputPanel.add(noteField);
-        inputPanel.add(addBtn);
+        btnPanel.add(addBtn);
+
+        inputPanel.add(fieldsPanel, BorderLayout.CENTER);
+        inputPanel.add(btnPanel, BorderLayout.EAST);
 
         return inputPanel;
     }
@@ -227,8 +426,12 @@ public class MainFrame extends JFrame {
         JPanel tablePanel = new JPanel(new BorderLayout(0, 14));
         tablePanel.setOpaque(false);
 
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 10));
-        searchPanel.setOpaque(false);
+        // Top row: filters on the left, Edit/Delete actions on the right
+        JPanel searchRow = new JPanel(new BorderLayout());
+        searchRow.setOpaque(false);
+
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 10));
+        filterPanel.setOpaque(false);
 
         JComboBox<String> searchType = new JComboBox<>(new String[] { "All", "Income", "Expense" });
         JTextField searchYear = new JTextField(6);
@@ -241,18 +444,35 @@ public class MainFrame extends JFrame {
         searchYear.setPreferredSize(new Dimension(80, 38));
         searchMonth.setPreferredSize(new Dimension(70, 38));
 
-        searchPanel.add(new JLabel("Filter Type:"));
-        searchPanel.add(searchType);
-        searchPanel.add(new JLabel("Year:"));
-        searchPanel.add(searchYear);
-        searchPanel.add(new JLabel("Month (1-12):"));
-        searchPanel.add(searchMonth);
-        searchPanel.add(searchBtn);
+        filterPanel.add(new JLabel("Filter Type:"));
+        filterPanel.add(searchType);
+        filterPanel.add(new JLabel("Year:"));
+        filterPanel.add(searchYear);
+        filterPanel.add(new JLabel("Month (1-12):"));
+        filterPanel.add(searchMonth);
+        filterPanel.add(searchBtn);
 
         searchBtn.addActionListener(e -> loadTableData(
                 searchType.getSelectedItem().toString(),
                 searchYear.getText().trim(),
                 searchMonth.getText().trim()));
+
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        actionPanel.setOpaque(false);
+
+        RoundedButton editBtn = new RoundedButton("Edit Selected", new Color(255, 193, 7), Color.DARK_GRAY);
+        RoundedButton deleteBtn = new RoundedButton("Delete Selected", new Color(220, 53, 69), Color.WHITE);
+        editBtn.setPreferredSize(new Dimension(140, 38));
+        deleteBtn.setPreferredSize(new Dimension(150, 38));
+
+        editBtn.addActionListener(e -> handleEditAction());
+        deleteBtn.addActionListener(e -> handleDeleteAction());
+
+        actionPanel.add(editBtn);
+        actionPanel.add(deleteBtn);
+
+        searchRow.add(filterPanel, BorderLayout.WEST);
+        searchRow.add(actionPanel, BorderLayout.EAST);
 
         String[] columns = { "ID", "Date", "Type", "Amount", "Note" };
         tableModel = new DefaultTableModel(columns, 0) {
@@ -293,24 +513,8 @@ public class MainFrame extends JFrame {
         scrollPane.getViewport().setBackground(Color.WHITE);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(220, 224, 230), 1, true));
 
-        // Edit / Delete action panel
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
-        actionPanel.setOpaque(false);
-
-        RoundedButton editBtn = new RoundedButton("Edit Selected", new Color(255, 193, 7), Color.DARK_GRAY);
-        RoundedButton deleteBtn = new RoundedButton("Delete Selected", new Color(220, 53, 69), Color.WHITE);
-        editBtn.setPreferredSize(new Dimension(150, 40));
-        deleteBtn.setPreferredSize(new Dimension(150, 40));
-
-        editBtn.addActionListener(e -> handleEditAction());
-        deleteBtn.addActionListener(e -> handleDeleteAction());
-
-        actionPanel.add(editBtn);
-        actionPanel.add(deleteBtn);
-
-        tablePanel.add(searchPanel, BorderLayout.NORTH);
+        tablePanel.add(searchRow, BorderLayout.NORTH);
         tablePanel.add(scrollPane, BorderLayout.CENTER);
-        tablePanel.add(actionPanel, BorderLayout.SOUTH);
         return tablePanel;
     }
 
@@ -406,8 +610,10 @@ public class MainFrame extends JFrame {
     }
 
     private void refreshData() {
+        checkAndArchiveYear();
         loadTableData("All", "", "");
         updateStatistics();
+        refreshArchivePanel();
     }
 
     private void loadTableData(String typeFilter, String year, String month) {
