@@ -14,6 +14,7 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import src.model.Transaction;
 import src.service.TransactionService;
+import src.session.Session;
 import src.ui.components.RoundedButton;
 import src.utils.DateUtils;
 
@@ -56,7 +57,7 @@ public class MainFrame extends JFrame {
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
 
-        JLabel title = new JLabel("MoneyMap");
+        JLabel title = new JLabel("MoneyMap - " + Session.username);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(33, 37, 41));
 
@@ -460,8 +461,8 @@ public class MainFrame extends JFrame {
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         actionPanel.setOpaque(false);
 
-        RoundedButton editBtn = new RoundedButton("Edit Selected", new Color(255, 193, 7), Color.DARK_GRAY);
-        RoundedButton deleteBtn = new RoundedButton("Delete Selected", new Color(220, 53, 69), Color.WHITE);
+        RoundedButton editBtn = new RoundedButton("Edit ", new Color(255, 193, 7), Color.DARK_GRAY);
+        RoundedButton deleteBtn = new RoundedButton("Delete ", new Color(220, 53, 69), Color.WHITE);
         editBtn.setPreferredSize(new Dimension(140, 38));
         deleteBtn.setPreferredSize(new Dimension(150, 38));
 

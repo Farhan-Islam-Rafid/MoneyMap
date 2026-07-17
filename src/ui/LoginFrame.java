@@ -1,15 +1,22 @@
 package src.ui;
 
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import src.database.DBConnection;
+import src.session.Session;
 import src.ui.components.RoundedButton;
 
 public class LoginFrame extends JFrame {
 
     public LoginFrame() {
         setTitle("MoneyMap v2.0 - Login");
-        setSize(460, 520);
+        setSize(460, 560); // Slightly taller to fit the register link comfortably
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
@@ -60,17 +67,69 @@ public class LoginFrame extends JFrame {
         loginBtn.setMaximumSize(new Dimension(320, 48));
         loginBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
 
+        // Link to Register Page
+        JLabel registerLink = new JLabel("<html><u>Don't have an account? Register here</u></html>");
+        registerLink.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        registerLink.setForeground(new Color(108, 117, 125));
+        registerLink.setAlignmentX(Component.CENTER_ALIGNMENT);
+        registerLink.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        registerLink.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                dispose(); // Close Login
+                new RegisterFrame().setVisible(true); // Open Register
+            }
+        });
+
+        // Database Authentication Action
         loginBtn.addActionListener(e -> {
             String username = userField.getText().trim();
             String password = new String(passField.getPassword()).trim();
 
-            if (username.equals("rafid") && password.equals("1234")) {
-                dispose(); // Close login
-                new MainFrame().setVisible(true);
-            } else {
+            if (username.isEmpty() || password.isEmpty()) {
                 JOptionPane.showMessageDialog(this,
-                        "Invalid username or password.",
-                        "Login Failed",
+                        "Please enter both username and password.",
+                        "Input Error",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            try (Connection conn = DBConnection.getConnection();
+                    PreparedStatement pstmt = conn
+                            .prepareStatement("SELECT * FROM users WHERE username = ? AND password = ?")) {
+
+                pstmt.setString(1, username);
+                pstmt.setString(2, password); // Note: In a production app, use hashed passwords!
+
+                ResultSet rs = pstmt.executeQuery();
+
+                if (rs.next()) {
+
+                    int userId = rs.getInt("id");
+
+                    String loggedUsername = rs.getString("username");
+
+                    // Save logged in user information
+                    Session.setUser(userId, loggedUsername);
+
+                    System.out.println(
+                            "Login User ID : " + Session.userId);
+
+                    dispose(); // Close login
+
+                    new MainFrame().setVisible(true);
+
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Invalid username or password.",
+                            "Login Failed",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this,
+                        "Database connection error. Ensure MySQL is running.",
+                        "Error",
                         JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -92,6 +151,8 @@ public class LoginFrame extends JFrame {
         loginCard.add(Box.createRigidArea(new Dimension(0, 35)));
 
         loginCard.add(loginBtn);
+        loginCard.add(Box.createRigidArea(new Dimension(0, 15)));
+        loginCard.add(registerLink); // Added register link to the layout
 
         contentPane.add(loginCard, BorderLayout.CENTER);
         setContentPane(contentPane);
@@ -104,7 +165,4 @@ public class LoginFrame extends JFrame {
                 BorderFactory.createLineBorder(new Color(200, 205, 210), 1),
                 new EmptyBorder(10, 14, 10, 14)));
     }
-
-    // Optional: Add a small footer or branding
-    // You can extend this later if needed
 }
