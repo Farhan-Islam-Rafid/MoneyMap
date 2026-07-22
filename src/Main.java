@@ -48,7 +48,7 @@ public class Main {
                         splash.dispose();
                         JOptionPane.showMessageDialog(null,
                                 "Failed to start MoneyMap: " + e.getMessage()
-                                        + "\n\nPlease check your database connection and try again.",
+                                + "\n\nPlease check your database connection and try again.",
                                 "Startup Error",
                                 JOptionPane.ERROR_MESSAGE);
                     });
@@ -58,7 +58,10 @@ public class Main {
         });
     }
 
-    /** Safely updates the splash status label on the EDT from a background thread. */
+    /**
+     * Safely updates the splash status label on the EDT from a background
+     * thread.
+     */
     private static void updateStatus(SplashScreen splash, String text) {
         SwingUtilities.invokeLater(() -> splash.setStatus(text));
     }

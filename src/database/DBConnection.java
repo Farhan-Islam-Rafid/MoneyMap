@@ -12,6 +12,8 @@ public class DBConnection {
 
     static {
 
+        System.out.println("Starting HikariCP...");
+
         HikariConfig config = new HikariConfig();
 
         config.setJdbcUrl(Config.get("DB_URL"));
@@ -20,12 +22,23 @@ public class DBConnection {
 
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(3);
-        config.setConnectionTimeout(30000);
+        config.setConnectionTimeout(10000);
+
+        System.out.println("Creating datasource...");
 
         dataSource = new HikariDataSource(config);
+
+        System.out.println("Datasource created!");
     }
 
     public static Connection getConnection() throws SQLException {
-        return dataSource.getConnection();
+
+        System.out.println("Trying database connection...");
+
+        Connection con = dataSource.getConnection();
+
+        System.out.println("Database connected!");
+
+        return con;
     }
 }
