@@ -1,0 +1,11 @@
+config.properties
+
+target/
+
+.idea/
+
+.vscode/
+
+*.log
+
+*.class

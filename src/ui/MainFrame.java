@@ -1,17 +1,49 @@
 package src.ui;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Desktop;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.net.URI;
 import java.sql.Date;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.prefs.Preferences;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
+
+import src.model.DashboardStats;
 import src.model.Transaction;
 import src.service.TransactionService;
 import src.session.Session;
@@ -37,8 +69,19 @@ public class MainFrame extends JFrame {
         setTitle("MoneyMap v2.0 - Dashboard");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+            ImageIcon appIcon = loadIcon("/icons/moneymap.png");
+    if (appIcon != null) {
+        setIconImage(appIcon.getImage());
+    }
+
+    // Best balance: Maximized window
+    setExtendedState(JFrame.MAXIMIZED_BOTH);
+
+
         // Best balance: Maximized window
         setExtendedState(JFrame.MAXIMIZED_BOTH);
+
+
 
         JPanel contentPane = new JPanel(new BorderLayout(15, 15));
         contentPane.setBackground(new Color(245, 247, 250));
@@ -48,6 +91,7 @@ public class MainFrame extends JFrame {
         contentPane.add(createStatsPanel(), BorderLayout.NORTH);
         contentPane.add(createMainContentPanel(), BorderLayout.CENTER);
         contentPane.add(createArchivePanel(), BorderLayout.EAST);
+        contentPane.add(createFooterPanel(), BorderLayout.SOUTH);
 
         setContentPane(contentPane);
         refreshData();
@@ -71,7 +115,78 @@ public class MainFrame extends JFrame {
         leftPanel.add(subtitle);
 
         header.add(leftPanel, BorderLayout.WEST);
+        header.add(createLogoutPanel(), BorderLayout.EAST);
         return header;
+    }
+
+    /**
+     * Small panel holding the Logout button, aligned to the right of the header.
+     */
+    private JPanel createLogoutPanel() {
+        JPanel logoutPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        logoutPanel.setOpaque(false);
+
+        RoundedButton logoutBtn = new RoundedButton("Logout", new Color(220, 53, 69), Color.WHITE);
+        logoutBtn.setPreferredSize(new Dimension(120, 40));
+        logoutBtn.addActionListener(e -> handleLogout());
+
+        logoutPanel.add(logoutBtn);
+        return logoutPanel;
+    }
+
+    /**
+     * Confirms with the user, then closes this dashboard and opens the login window.
+     */
+    private void handleLogout() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to logout?",
+                "Confirm Logout",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            this.dispose();
+            SwingUtilities.invokeLater(() -> {
+                LoginFrame loginFrame = new LoginFrame();
+                loginFrame.setVisible(true);
+            });
+        }
+    }
+
+    /**
+     * Small footer with developer credit and a clickable GitHub link.
+     */
+    private JPanel createFooterPanel() {
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 8));
+        footer.setOpaque(false);
+
+        JLabel prefixLabel = new JLabel("Developed by");
+        prefixLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        prefixLabel.setForeground(new Color(130, 135, 140));
+
+        JLabel nameLink = new JLabel("Farhan Islam Rafid");
+        nameLink.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        nameLink.setForeground(new Color(0, 102, 204));
+        nameLink.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        nameLink.setToolTipText("https://github.com/Farhan-Islam-Rafid");
+        nameLink.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                try {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().browse(new URI("https://github.com/Farhan-Islam-Rafid"));
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(MainFrame.this,
+                            "Could not open link: https://github.com/Farhan-Islam-Rafid",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        footer.add(prefixLabel);
+        footer.add(nameLink);
+        return footer;
     }
 
     private JPanel createStatsPanel() {
@@ -228,6 +343,25 @@ public class MainFrame extends JFrame {
         String updated = existing.isEmpty() ? record : existing + ";" + record;
         prefs.put("archivedYears", updated);
     }
+
+    /**
+ * Loads an icon from the classpath, falling back to a relative filesystem
+ * path if it isn't found there. Returns null (and skips the icon) if
+ * neither location has the file, so a missing image never crashes the UI.
+ */
+private ImageIcon loadIcon(String fileName) {
+    java.net.URL url = getClass().getResource(fileName);
+    if (url != null) {
+        return new ImageIcon(url);
+    }
+    String relativePath = fileName.startsWith("/") ? fileName.substring(1) : fileName;
+    java.io.File file = new java.io.File(relativePath);
+    if (file.exists()) {
+        return new ImageIcon(file.getAbsolutePath());
+    }
+    System.err.println("Warning: " + fileName + " not found, skipping icon.");
+    return null;
+}
 
     private void refreshArchivePanel() {
         archiveListPanel.removeAll();
@@ -637,52 +771,216 @@ public class MainFrame extends JFrame {
     }
 
     private void updateStatistics() {
-        try {
-            LocalDate today = LocalDate.now();
 
-            double totalInc = service.getSum("Income", null, null);
-            double totalExp = service.getSum("Expense", null, null);
-            double balance = totalInc - totalExp;
+    try {
 
-            balanceLabel.setText("৳ " + currencyFormat.format(balance));
-            balanceLabel.setForeground(balance >= 0 ? new Color(40, 167, 69) : new Color(220, 53, 69));
+        LocalDate today = LocalDate.now();
 
-            // Today
-            double todayInc = service.getSum("Income", today, today);
-            double todayExp = service.getSum("Expense", today, today);
-            todayIncLabel.setText("Income: ৳ " + currencyFormat.format(todayInc));
-            todayExpLabel.setText("Expense: ৳ " + currencyFormat.format(todayExp));
 
-            // This Month
-            LocalDate monthStart = today.withDayOfMonth(1);
-            LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
-            double mInc = service.getSum("Income", monthStart, monthEnd);
-            double mExp = service.getSum("Expense", monthStart, monthEnd);
-            monthBalLabel.setText("Balance: ৳ " + currencyFormat.format(mInc - mExp));
-            monthIncLabel.setText("Income: ৳ " + currencyFormat.format(mInc));
-            monthExpLabel.setText("Expense: ৳ " + currencyFormat.format(mExp));
+        // ================= CURRENT BALANCE =================
 
-            // Previous Month
-            LocalDate pStart = monthStart.minusMonths(1);
-            LocalDate pEnd = pStart.withDayOfMonth(pStart.lengthOfMonth());
-            double pInc = service.getSum("Income", pStart, pEnd);
-            double pExp = service.getSum("Expense", pStart, pEnd);
-            prevBalLabel.setText("Balance: ৳ " + currencyFormat.format(pInc - pExp));
-            prevIncLabel.setText("Income: ৳ " + currencyFormat.format(pInc));
-            prevExpLabel.setText("Expense: ৳ " + currencyFormat.format(pExp));
+        DashboardStats total =
+                service.getDashboardStats(
+                        LocalDate.of(2000, 1, 1),
+                        today
+                );
 
-            // Last 12 Months
-            LocalDate yStart = today.minusMonths(12);
-            double yInc = service.getSum("Income", yStart, today);
-            double yExp = service.getSum("Expense", yStart, today);
-            yearSaveLabel.setText("Saved: ৳ " + currencyFormat.format(yInc - yExp));
-            yearIncLabel.setText("Income: ৳ " + currencyFormat.format(yInc));
-            yearExpLabel.setText("Expense: ৳ " + currencyFormat.format(yExp));
 
-        } catch (Exception e) {
-            System.err.println("Statistics update error: " + e.getMessage());
-        }
+        double balance = total.getBalance();
+
+
+        balanceLabel.setText(
+                "৳ " + currencyFormat.format(balance)
+        );
+
+
+        balanceLabel.setForeground(
+                balance >= 0
+                ? new Color(40,167,69)
+                : new Color(220,53,69)
+        );
+
+
+
+
+
+        // ================= TODAY =================
+
+        DashboardStats todayStats =
+                service.getDashboardStats(
+                        today,
+                        today
+                );
+
+
+        todayIncLabel.setText(
+                "Income: ৳ "
+                + currencyFormat.format(
+                    todayStats.getIncome()
+                )
+        );
+
+
+        todayExpLabel.setText(
+                "Expense: ৳ "
+                + currencyFormat.format(
+                    todayStats.getExpense()
+                )
+        );
+
+
+
+
+
+
+        // ================= THIS MONTH =================
+
+        LocalDate monthStart =
+                today.withDayOfMonth(1);
+
+
+        LocalDate monthEnd =
+                today.withDayOfMonth(
+                        today.lengthOfMonth()
+                );
+
+
+
+        DashboardStats monthStats =
+                service.getDashboardStats(
+                        monthStart,
+                        monthEnd
+                );
+
+
+
+        monthBalLabel.setText(
+                "Balance: ৳ "
+                + currencyFormat.format(
+                    monthStats.getBalance()
+                )
+        );
+
+
+        monthIncLabel.setText(
+                "Income: ৳ "
+                + currencyFormat.format(
+                    monthStats.getIncome()
+                )
+        );
+
+
+        monthExpLabel.setText(
+                "Expense: ৳ "
+                + currencyFormat.format(
+                    monthStats.getExpense()
+                )
+        );
+
+
+
+
+
+
+        // ================= PREVIOUS MONTH =================
+
+        LocalDate prevStart =
+                monthStart.minusMonths(1);
+
+
+        LocalDate prevEnd =
+                prevStart.withDayOfMonth(
+                        prevStart.lengthOfMonth()
+                );
+
+
+
+        DashboardStats prevStats =
+                service.getDashboardStats(
+                        prevStart,
+                        prevEnd
+                );
+
+
+
+        prevBalLabel.setText(
+                "Balance: ৳ "
+                + currencyFormat.format(
+                    prevStats.getBalance()
+                )
+        );
+
+
+        prevIncLabel.setText(
+                "Income: ৳ "
+                + currencyFormat.format(
+                    prevStats.getIncome()
+                )
+        );
+
+
+        prevExpLabel.setText(
+                "Expense: ৳ "
+                + currencyFormat.format(
+                    prevStats.getExpense()
+                )
+        );
+
+
+
+
+
+
+        // ================= LAST 12 MONTH =================
+
+        LocalDate yearStart =
+                today.minusMonths(12);
+
+
+
+        DashboardStats yearStats =
+                service.getDashboardStats(
+                        yearStart,
+                        today
+                );
+
+
+
+        yearSaveLabel.setText(
+                "Saved: ৳ "
+                + currencyFormat.format(
+                    yearStats.getBalance()
+                )
+        );
+
+
+        yearIncLabel.setText(
+                "Income: ৳ "
+                + currencyFormat.format(
+                    yearStats.getIncome()
+                )
+        );
+
+
+        yearExpLabel.setText(
+                "Expense: ৳ "
+                + currencyFormat.format(
+                    yearStats.getExpense()
+                )
+        );
+
+
+
+    } catch(Exception e){
+
+        System.err.println(
+                "Statistics update error: "
+                + e.getMessage()
+        );
+
     }
+
+}
 
     /** Helper method for consistent currency formatting with commas */
     private String formatCurrency(double amount) {

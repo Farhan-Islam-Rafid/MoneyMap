@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+
+    <modelVersion>4.0.0</modelVersion>
+
+
+    <groupId>com.moneymap</groupId>
+
+    <artifactId>MoneyMap</artifactId>
+
+    <version>2.0.0</version>
+
+    <packaging>jar</packaging>
+
+
+    <name>MoneyMap</name>
+
+    <description>
+        Professional Personal Finance Management System
+    </description>
+
+
+
+    <!-- Java Version -->
+
+    <properties>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <maven.compiler.release>25</maven.compiler.release>
+
+    </properties>
+
+
+
+
+
+    <!-- Dependencies -->
+
+    <dependencies>
+
+
+        <!-- Neon PostgreSQL JDBC Driver -->
+
+        <dependency>
+
+            <groupId>org.postgresql</groupId>
+
+            <artifactId>postgresql</artifactId>
+
+            <version>42.7.5</version>
+
+        </dependency>
+
+
+
+
+
+        <!-- HikariCP Database Connection Pool -->
+
+        <dependency>
+
+            <groupId>com.zaxxer</groupId>
+
+            <artifactId>HikariCP</artifactId>
+
+            <version>6.2.1</version>
+
+        </dependency>
+
+
+
+
+
+        <!-- FlatLaf Modern Swing UI -->
+
+        <dependency>
+
+            <groupId>com.formdev</groupId>
+
+            <artifactId>flatlaf</artifactId>
+
+            <version>3.6</version>
+
+        </dependency>
+
+
+
+    </dependencies>
+
+
+
+
+
+
+
+    <build>
+
+        <!-- Java source folder -->
+        <sourceDirectory>src</sourceDirectory>
+
+
+        <!-- Resource folder for icons/images -->
+        <resources>
+
+            <resource>
+
+                <directory>src/resources</directory>
+
+                <includes>
+
+                    <include>**/*</include>
+
+                </includes>
+
+            </resource>
+
+        </resources>
+
+
+
+        <plugins>
+
+
+            <!-- Java Compiler -->
+            <plugin>
+
+                <groupId>org.apache.maven.plugins</groupId>
+
+                <artifactId>maven-compiler-plugin</artifactId>
+
+                <version>3.14.0</version>
+
+                <configuration>
+
+                    <release>25</release>
+
+                </configuration>
+
+            </plugin>
+
+
+
+            <!-- Fat JAR -->
+            <plugin>
+
+                <groupId>org.apache.maven.plugins</groupId>
+
+                <artifactId>maven-shade-plugin</artifactId>
+
+                <version>3.6.1</version>
+
+
+                <executions>
+
+                    <execution>
+
+                        <phase>package</phase>
+
+                        <goals>
+
+                            <goal>shade</goal>
+
+                        </goals>
+
+
+                        <configuration>
+
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+
+
+                            <transformers>
+
+                                <transformer implementation=
+                            "org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+
+                                    <mainClass>src.Main</mainClass>
+
+                                </transformer>
+
+
+                            </transformers>
+
+
+                        </configuration>
+
+
+                    </execution>
+
+
+                </executions>
+
+
+            </plugin>
+
+
+        </plugins>
+
+
+    </build>
+
+
+
+
+</project>

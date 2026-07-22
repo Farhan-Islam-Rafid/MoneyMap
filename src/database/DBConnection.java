@@ -1,22 +1,31 @@
 package src.database;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class DBConnection {
-    // We connect to the MySQL server first without a database to ensure we can
-    // create it
-    private static final String BASE_URL = "jdbc:mysql://localhost:3306/";
-    private static final String DB_NAME = "moneymap_db";
-    private static final String USER = "root";
-    private static final String PASS = "";
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
-    public static Connection getBaseConnection() throws SQLException {
-        return DriverManager.getConnection(BASE_URL, USER, PASS);
+public class DBConnection {
+
+    private static final HikariDataSource dataSource;
+
+    static {
+
+        HikariConfig config = new HikariConfig();
+
+        config.setJdbcUrl(Config.get("DB_URL"));
+        config.setUsername(Config.get("DB_USER"));
+        config.setPassword(Config.get("DB_PASSWORD"));
+
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(3);
+        config.setConnectionTimeout(30000);
+
+        dataSource = new HikariDataSource(config);
     }
 
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(BASE_URL + DB_NAME, USER, PASS);
+        return dataSource.getConnection();
     }
 }

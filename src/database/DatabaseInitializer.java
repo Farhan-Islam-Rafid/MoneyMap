@@ -5,54 +5,47 @@ import java.sql.Statement;
 
 public class DatabaseInitializer {
 
-    public static void initialize() {
+        public static void initialize() {
 
-        try (Connection conn = DBConnection.getBaseConnection();
-                Statement stmt = conn.createStatement()) {
+                try (Connection conn = DBConnection.getConnection();
+                                Statement stmt = conn.createStatement()) {
 
-            // Create Database
-            stmt.executeUpdate(
-                    "CREATE DATABASE IF NOT EXISTS moneymap_db");
+                        // Users Table
+                        String usersTable = "CREATE TABLE IF NOT EXISTS users ("
+                                        + "id SERIAL PRIMARY KEY,"
+                                        + "full_name VARCHAR(100) NOT NULL,"
+                                        + "username VARCHAR(50) UNIQUE NOT NULL,"
+                                        + "password VARCHAR(255) NOT NULL"
+                                        + ")";
 
-            // Connect Database
-            try (Connection dbConn = DBConnection.getConnection();
-                    Statement dbStmt = dbConn.createStatement()) {
+                        stmt.executeUpdate(usersTable);
 
-                // Users Table
-                String usersTable = "CREATE TABLE IF NOT EXISTS users ("
-                        + "id INT AUTO_INCREMENT PRIMARY KEY,"
-                        + "full_name VARCHAR(100) NOT NULL,"
-                        + "username VARCHAR(50) NOT NULL UNIQUE,"
-                        + "password VARCHAR(255) NOT NULL"
-                        + ")";
+                        // Transactions Table
+                        String transactionsTable = "CREATE TABLE IF NOT EXISTS transactions ("
+                                        + "id SERIAL PRIMARY KEY,"
+                                        + "user_id INT NOT NULL,"
+                                        + "type VARCHAR(20) NOT NULL,"
+                                        + "amount DECIMAL(15,2) NOT NULL,"
+                                        + "trans_date DATE NOT NULL,"
+                                        + "note VARCHAR(255),"
+                                        + "FOREIGN KEY(user_id) REFERENCES users(id)"
+                                        + " ON DELETE CASCADE"
+                                        + ")";
 
-                dbStmt.executeUpdate(usersTable);
+                        stmt.executeUpdate(transactionsTable);
 
-                // Transactions Table
-                String transactionsTable = "CREATE TABLE IF NOT EXISTS transactions ("
-                        + "id INT AUTO_INCREMENT PRIMARY KEY,"
-                        + "user_id INT NOT NULL,"
-                        + "type VARCHAR(20) NOT NULL,"
-                        + "amount DECIMAL(15,2) NOT NULL,"
-                        + "trans_date DATE NOT NULL,"
-                        + "note VARCHAR(255),"
-                        + "FOREIGN KEY(user_id) REFERENCES users(id)"
-                        + " ON DELETE CASCADE"
-                        + ")";
+                        System.out.println(
+                                        "Neon PostgreSQL Database initialized successfully");
 
-                dbStmt.executeUpdate(transactionsTable);
+                } catch (Exception e) {
 
-                System.out.println(
-                        "Database initialized successfully");
+                        e.printStackTrace();
 
-            }
+                        System.err.println(
+                                        "Database initialization failed");
 
-        } catch (Exception e) {
+                }
 
-            e.printStackTrace();
-
-            System.err.println(
-                    "Database initialization failed");
         }
-    }
+
 }
