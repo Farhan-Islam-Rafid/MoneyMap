@@ -292,20 +292,8 @@ Password     : your_password
 **Farhan Islam Rafid**
 *Computer Science & Technology Student*
 
-**Skills:** Java · PostgreSQL · JDBC · Swing · Web Development · Problem Solving
-
-[![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github)](https://github.com/your-username)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/your-profile)
-
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License** — feel free to use, modify, and distribute it with attribution.
-
-```
-MIT License © 2026 Farhan Islam Rafid
-```
 
 <div align="center">
 
